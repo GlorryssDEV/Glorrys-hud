@@ -28,32 +28,3 @@ CreateThread(function()
         })
     end
 end)
-
-
-RegisterCommand('armour', function(source, args)
-    local amount = tonumber(args[1])
-
-    if amount == nil then
-        print("Použití: /armour [0-100]")
-        return
-    end
-
-    if amount < 0 then amount = 0 end
-    if amount > 100 then amount = 100 end
-
-    local ped = PlayerPedId()
-    SetPedArmour(ped, amount)
-
-    TriggerEvent('chat:addMessage', {
-        args = { '^2ARMOUR', 'Nastaveno na ' .. amount }
-    })
-end, false)
-
-
-RegisterCommand("carabine", function()
-    local ped = PlayerPedId()
-
-    local weapon = GetHashKey("WEAPON_CARBINERIFLE")
-
-    GiveWeaponToPed(ped, weapon, 250, false, true)
-end, false)

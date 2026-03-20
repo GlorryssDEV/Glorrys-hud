@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<title>HUD</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box}
+body{overflow:hidden;font-family:'JetBrains Mono',monospace;background:transparent}
+
+#hud{
+  position:absolute;
+  bottom:52px;
+  left:50%;
+  transform:translateX(-50%) scale(1);
+  width:368px;
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+  padding:8px 0;
+  z-index:9999;
+  user-select:none;
+  transition:.44s cubic-bezier(.22,1.1,.38,1.58);
+  transform-origin:top left;
+  cursor:grab;
+}
+#hud:active{cursor:grabbing}
+
+#hint{
+  position:absolute;
+  width:368px;
+  font-size:12px;
+  color:rgba(255,255,255,0.6);
+  text-align:center;
+  opacity:0;
+  transition:.25s;
+  pointer-events:none;
+  font-weight:600;
+}
+
+.bar{
+  width:100%;
+  height:28px;
+  background:#0a0a0f;
+  border:1px solid #12121f;
+  box-shadow:0 12px 52px #000000d9,inset 0 1px 3px #ffffff08;
+  position:relative;
+  overflow:hidden;
+}
+
+.fill{height:100%;width:0%;transition:width .5s}
+#hp .fill{background:#720808}
+#armor .fill{background:#172e6e}
+
+.percent{
+  position:absolute;
+  right:24px;
+  top:50%;
+  transform:translateY(-50%);
+  font-weight:700;
+  color:#fff;
+  pointer-events:none;
+}
+
+.lowhp .fill{animation:low 2s infinite}
+@keyframes low{
+  0%,100%{box-shadow:inset 0 0 22px #72080888}
+  50%{box-shadow:inset 0 0 44px #720808dd}
+}
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <div class="bar" id="hp">
+    <div class="fill"></div>
+    <div class="percent">100%</div>
+  </div>
+  <div class="bar" id="armor">
+    <div class="fill"></div>
+    <div class="percent">0%</div>
+  </div>
+</div>
+
+<div id="hint">Press ENTER to confirm</div>
+
+<script>
+const hud = document.getElementById("hud")
+const hint = document.getElementById("hint")
+const hpFill = hud.children[0].children[0]
+const hpText = hud.children[0].children[1]
+const hpBox  = hud.children[0]
+const arFill = hud.children[1].children[0]
+const arText = hud.children[1].children[1]
+
+let edit = false, drag = false
+let offX=0, offY=0
+let scale=1, height=1
+let cache = null
+
+const BASE = {w:368, bar:28, gap:16, pad:8}
+const clamp = (v,min,max)=> v<min?min:v>max?max:v
+const getH = ()=> (BASE.bar*2 + BASE.gap*height + BASE.pad*2*height)*scale
+
+function layout(){
+  const barH = BASE.bar*height
+  hud.style.gap = BASE.gap*height+"px"
+  hud.style.padding = BASE.pad*height+"px 0"
+  hpBox.style.height = barH+"px"
+  hud.children[1].style.height = barH+"px"
+  hpText.style.fontSize = (15.2*height)+"px"
+  arText.style.fontSize = (15.2*height)+"px"
+  hud.style.transform = edit ? `scale(${scale})` : `translateX(-50%) scale(${scale})`
+}
+
+function moveHint(x,y){
+  hint.style.left = x+"px"
+  hint.style.top = (y+getH()+6)+"px"
+}
+
+hud.onmousedown = e=>{
+  if(!edit) return
+  const r = hud.getBoundingClientRect()
+  drag=true
+  offX=e.clientX-r.left
+  offY=e.clientY-r.top
+  hud.style.transition="none"
+}
+
+document.onmousemove = e=>{
+  if(!drag) return
+  let x=e.clientX-offX
+  let y=e.clientY-offY
+  const w=BASE.w*scale, h=getH()
+  x = clamp(x,6,innerWidth-w-6)
+  y = clamp(y,6,innerHeight-h-6)
+  hud.style.left=x+"px"
+  hud.style.top=y+"px"
+  hud.style.bottom="auto"
+  moveHint(x,y)
+}
+
+document.onmouseup = ()=>{
+  if(!drag) return
+  drag=false
+  hud.style.transition=""
+}
+
+hud.onwheel = e=>{
+  if(!edit) return
+  e.preventDefault()
+  scale = clamp(scale + (e.deltaY>0?-0.05:0.05),0.65,1.8)
+  layout()
+}
+
+let last=0
+window.addEventListener("message", e=>{
+  const d=e.data
+  if(!d?.action) return
+
+  if(d.action==="update"){
+    const now=performance.now()
+    if(now-last<50) return
+    last=now
+    const h=clamp(d.health||0,0,100)
+    const a=clamp(d.armor||0,0,100)
+    hpFill.style.width=h+"%"
+    hpText.textContent=h+"%"
+    arFill.style.width=a+"%"
+    arText.textContent=a+"%"
+    hpBox.classList.toggle("lowhp",h<=25)
+  }
+
+  if(d.action==="edit"){
+    edit=!!d.state
+    if(edit){
+      const r=hud.getBoundingClientRect()
+      hud.style.left=r.left+"px"
+      hud.style.top=r.top+"px"
+      hud.style.bottom="auto"
+      hint.style.opacity="1"
+      moveHint(r.left,r.top)
+      cache={x:r.left,y:r.top,s:scale,h:height}
+      layout()
+    } else hint.style.opacity="0"
+  }
+})
+
+document.onkeydown = e=>{
+  if(!edit) return
+  if(e.key==="Enter"){
+    localStorage.setItem("hudSave", JSON.stringify({
+      left:hud.offsetLeft,
+      top:hud.offsetTop,
+      scale,
+      heightMult:height
+    }))
+    fetch(`https://${GetParentResourceName()}/close`, {method:"POST"}).then(()=>{
+      edit=false
+      hint.style.opacity="0"
+      SetNuiFocus(false,false)
+    })
+  }
+  if(e.key==="Escape"){
+    if(cache){
+      hud.style.left=cache.x+"px"
+      hud.style.top=cache.y+"px"
+      scale=cache.s||1
+      height=cache.h||1
+      layout()
+      moveHint(cache.x,cache.y)
+    }
+    fetch(`https://${GetParentResourceName()}/close`, {method:"POST"}).then(()=>{
+      edit=false
+      hint.style.opacity="0"
+      SetNuiFocus(false,false)
+    })
+  }
+}
+
+onload=()=>{
+  try{
+    const d=JSON.parse(localStorage.getItem("hudSave"))
+    if(d){
+      hud.style.left=d.left+"px"
+      hud.style.top=d.top+"px"
+      scale=d.scale||1
+      height=d.height||1
+      hud.style.bottom="auto"
+    }
+  }catch{}
+  layout()
+}
+</script>
+</body>
+</html>

@@ -199,7 +199,6 @@ document.onkeydown = e=>{
     fetch(`https://${GetParentResourceName()}/close`, {method:"POST"}).then(()=>{
       edit=false
       hint.style.opacity="0"
-      SetNuiFocus(false,false)
     })
   }
   if(e.key==="Escape"){
@@ -214,7 +213,6 @@ document.onkeydown = e=>{
     fetch(`https://${GetParentResourceName()}/close`, {method:"POST"}).then(()=>{
       edit=false
       hint.style.opacity="0"
-      SetNuiFocus(false,false)
     })
   }
 }
